@@ -1,0 +1,14 @@
+{
+  "name": "university-research-administration-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Research administration for grants, IRB, contracts, subawards, compliance, effort reporting, and faculty support.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node scripts/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

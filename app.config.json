@@ -1,0 +1,145 @@
+{
+  "slug": "university-research-administration-suite",
+  "title": "University Research Administration Suite",
+  "buyer": "Universities, research institutes, sponsored programs offices",
+  "description": "Research administration for grants, IRB, contracts, subawards, compliance, effort reporting, and faculty support.",
+  "modules": [
+    {
+      "id": "proposals",
+      "table": "proposals",
+      "label": "Proposals",
+      "description": "Proposals workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "Funding opportunity",
+        "Budget",
+        "Submission"
+      ],
+      "prefix": "P",
+      "seedValues": [
+        "Funding opportunity",
+        "Budget",
+        "Submission"
+      ]
+    },
+    {
+      "id": "awards",
+      "table": "awards",
+      "label": "Awards",
+      "description": "Awards workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "Award setup",
+        "Terms",
+        "Milestones"
+      ],
+      "prefix": "A",
+      "seedValues": [
+        "Award setup",
+        "Terms",
+        "Milestones"
+      ]
+    },
+    {
+      "id": "irb",
+      "table": "irb",
+      "label": "IRB",
+      "description": "IRB workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "Protocols",
+        "Consent",
+        "Continuing review"
+      ],
+      "prefix": "I",
+      "seedValues": [
+        "Protocols",
+        "Consent",
+        "Continuing review"
+      ]
+    },
+    {
+      "id": "contracts",
+      "table": "contracts",
+      "label": "Research Contracts",
+      "description": "Research Contracts workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "NDA",
+        "CTA",
+        "Data use agreement"
+      ],
+      "prefix": "RC",
+      "seedValues": [
+        "NDA",
+        "CTA",
+        "Data use agreement"
+      ]
+    },
+    {
+      "id": "subawards",
+      "table": "subawards",
+      "label": "Subawards",
+      "description": "Subawards workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "Subrecipient",
+        "Risk review",
+        "Invoices"
+      ],
+      "prefix": "S",
+      "seedValues": [
+        "Subrecipient",
+        "Risk review",
+        "Invoices"
+      ]
+    },
+    {
+      "id": "compliance",
+      "table": "compliance",
+      "label": "Compliance",
+      "description": "Compliance workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "COI",
+        "Export control",
+        "Training"
+      ],
+      "prefix": "C",
+      "seedValues": [
+        "COI",
+        "Export control",
+        "Training"
+      ]
+    },
+    {
+      "id": "effort",
+      "table": "effort",
+      "label": "Effort Reporting",
+      "description": "Effort Reporting workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "Certification",
+        "Payroll",
+        "Exceptions"
+      ],
+      "prefix": "ER",
+      "seedValues": [
+        "Certification",
+        "Payroll",
+        "Exceptions"
+      ]
+    },
+    {
+      "id": "faculty-support",
+      "table": "facultySupport",
+      "label": "Faculty Support",
+      "description": "Faculty Support workspace for University Research Administration Suite.",
+      "subfeatures": [
+        "Tasks",
+        "Deadlines",
+        "Service desk"
+      ],
+      "prefix": "FS",
+      "seedValues": [
+        "Tasks",
+        "Deadlines",
+        "Service desk"
+      ]
+    }
+  ],
+  "port": 5616
+}
