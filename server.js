@@ -8,6 +8,8 @@ loadEnv();
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'app.config.json'), 'utf8'));
 const { createOperationsAI } = require('./operationsAI.cjs');
 const operationsAI = createOperationsAI({ config });
+const { createWave4B } = require('./wave4b.cjs');
+const wave4b = createWave4B({ config });
 const PORT = Number(process.env.PORT || config.port || 5500);
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -389,15 +391,9 @@ const server = http.createServer(async (req, res) => {
     const parsed = new URL(req.url, 'http://' + (req.headers.host || 'localhost'));
     const parts = parsed.pathname.split('/').filter(Boolean);
 
-    if (parsed.pathname === '/api/health') return sendJson(res, { ok: true, app: config.slug, title: config.title, persisted: fs.existsSync(STORE_FILE), records: Object.fromEntries(Object.entries(store.data).map(([k, v]) => [k, v.length])) });
+    if (parsed.pathname === '/api/health') return sendJson(res, { status: 'ok', ok: true, app: config.slug, title: config.title, persisted: fs.existsSync(STORE_FILE), records: Object.fromEntries(Object.entries(store.data).map(([k, v]) => [k, v.length])) });
     if (parsed.pathname === '/api/public-config') return sendJson(res, { slug: config.slug, title: config.title, description: config.description, port: PORT });
-    if (parsed.pathname === '/api/auth/demo-credentials' && req.method === 'GET') {
-      if (process.env.NODE_ENV === 'production') return sendJson(res, { error: 'Not found' }, 404);
-      res.setHeader('Cache-Control', 'no-store');
-      const demo = store.users.find((user) => user.role === 'Admin' && user.active !== false && user.email === `admin@${config.slug}.local` && user.password);
-      if (!demo) return sendJson(res, { error: 'Demo credentials are unavailable.' }, 404);
-      return sendJson(res, { email: demo.email, password: demo.password });
-    }
+    if (parsed.pathname === '/api/auth/demo-credentials' && req.method === 'GET') return sendJson(res, { error: 'Demo credentials are disabled. Enter your own credentials.' }, 404);
     if (parsed.pathname === '/api/auth/login' && req.method === 'POST') {
       const body = await readBody(req);
       const user = store.users.find((u) => u.email === body.email && u.password === body.password && u.active !== false);
@@ -462,6 +458,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, aiCenter());
     }
     if (await operationsAI.handle(req, res, parsed.pathname, { requireAuth, readBody, sendJson, store, saveStore, audit })) return;
+    if (await wave4b.handle(req, res, parsed.pathname, { requireAuth, readBody, sendJson, store, saveStore, audit })) return;
     if (parts[0] === 'api' && parts[1] === 'integrations' && parts[2] === 'test' && req.method === 'POST') {
       const session = requireAuth(req, res, 'write');
       if (!session) return;
@@ -482,6 +479,7 @@ const server = http.createServer(async (req, res) => {
       const table = parts[2];
       if (!store.data[table]) return sendJson(res, { error: 'Unknown table' }, 404);
       audit(session.user.email, 'Exported ' + table);
+      if (parsed.searchParams.get('format') === 'json') { res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="' + table + '.json"', 'X-Content-Type-Options': 'nosniff' }); return res.end(JSON.stringify({ table, exportedAt: now(), count: store.data[table].length, rows: store.data[table] }, null, 2)); }
       return sendCsv(res, table, store.data[table]);
     }
     if (parsed.pathname === '/api/upload' && req.method === 'POST') {
@@ -504,6 +502,17 @@ const server = http.createServer(async (req, res) => {
       saveStore();
       return sendJson(res, { row }, 201);
     }
+    if (parts[0] === 'api' && parts[1] === 'tasks') {
+      const id = decodeURIComponent(parts[2] || '');
+      if (req.method === 'GET') { const session = requireAuth(req, res, 'read'); if (!session) return; let rows = store.data.tasks; const q = (parsed.searchParams.get('q') || parsed.searchParams.get('search') || '').toLowerCase(); if (q) rows = rows.filter((row) => Object.values(row).some((value) => String(Array.isArray(value) ? value.join(' ') : value ?? '').toLowerCase().includes(q))); for (const key of ['status', 'priority', 'owner']) { const v = parsed.searchParams.get(key); if (v) rows = rows.filter((row) => String(row[key] || '').toLowerCase() === v.toLowerCase()); } return sendJson(res, { table: 'tasks', rows, total: rows.length }); }
+      const session = requireAuth(req, res, 'write'); if (!session) return;
+      const body = await readBody(req);
+      if (req.method === 'POST') { const row = normalizeRow({ ...body, id: body.id || nextId('tasks'), source: body.source || 'manual' }); const errors = validateRow(row); if (errors.length) return sendJson(res, { errors }, 422); store.data.tasks.unshift(row); audit(session.user.email, 'Created task', row.item); saveStore(); return sendJson(res, { row }, 201); }
+      const index = store.data.tasks.findIndex((row) => row.id === id);
+      if (index < 0) return sendJson(res, { error: 'Task not found' }, 404);
+      if (req.method === 'PUT' || req.method === 'PATCH') { const current = store.data.tasks[index]; if (body.expectedVersion && Number(body.expectedVersion) !== Number(current.version)) return sendJson(res, { error: 'Version conflict', current }, 409); const row = normalizeRow({ ...current, ...body, id, version: Number(current.version) + 1, updatedAt: now() }); row.riskScore = riskScore(row); const errors = validateRow(row); if (errors.length) return sendJson(res, { errors }, 422); store.data.tasks[index] = row; audit(session.user.email, 'Updated task', row.item); saveStore(); return sendJson(res, { row }); }
+      return sendJson(res, { error: 'Route not found' }, 404);
+    }
     if (parts[0] === 'api' && parts[1] === 'table') {
       const table = parts[2];
       const id = decodeURIComponent(parts[3] || '');
@@ -511,7 +520,16 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'GET') {
         const session = requireAuth(req, res, 'read');
         if (!session) return;
-        return sendJson(res, { table, rows: store.data[table] });
+        let rows = store.data[table];
+        const q = (parsed.searchParams.get('q') || '').toLowerCase();
+        const statusF = (parsed.searchParams.get('status') || '').toLowerCase();
+        const priorityF = (parsed.searchParams.get('priority') || '').toLowerCase();
+        const ownerF = (parsed.searchParams.get('owner') || '').toLowerCase();
+        if (q) rows = rows.filter((r) => Object.values(r).some((v) => String(Array.isArray(v) ? v.join(' ') : v ?? '').toLowerCase().includes(q)));
+        if (statusF) rows = rows.filter((r) => String(r.status || '').toLowerCase() === statusF);
+        if (priorityF) rows = rows.filter((r) => String(r.priority || '').toLowerCase() === priorityF);
+        if (ownerF) rows = rows.filter((r) => String(r.owner || '').toLowerCase().includes(ownerF));
+        return sendJson(res, { table, rows, total: rows.length, filters: { q: q || null, status: statusF || null, priority: priorityF || null, owner: ownerF || null } });
       }
       const permission = req.method === 'DELETE' ? 'delete' : 'write';
       const session = requireAuth(req, res, permission);
